@@ -8,7 +8,7 @@
     <ProjectGuid>{D2C08C58-269F-45DE-8A25-C5492BC625F8}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Fitbit</RootNamespace>
+    <RootNamespace>Fitbit.Api</RootNamespace>
     <AssemblyName>Fitbit</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -51,9 +51,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Authenticator.cs" />
+    <Compile Include="Config\FitBitConfiguration.cs" />
+    <Compile Include="Config\IConfigurationLoader.cs" />
+    <Compile Include="Config\XmlConfigurationLoader.cs" />
     <Compile Include="FitbitClient.cs" />
     <Compile Include="FitbitException.cs" />
     <Compile Include="Helpers\StringEnum.cs" />
+    <Compile Include="Helpers\XmlHelper.cs" />
     <Compile Include="Models\Activity.cs" />
     <Compile Include="Models\ActivityDistance.cs" />
     <Compile Include="Models\ActivityGoals.cs" />
@@ -63,6 +67,7 @@
     </Compile>
     <Compile Include="Models\ApiSubscription.cs" />
     <Compile Include="Models\AuthCredential.cs" />
+    <Compile Include="Models\AuthStep.cs" />
     <Compile Include="Models\Enums\APICollectionType.cs" />
     <Compile Include="Models\Enums\DeviceType.cs" />
     <Compile Include="Models\Enums\ResourceOwnerType.cs" />

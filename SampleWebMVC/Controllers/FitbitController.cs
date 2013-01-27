@@ -6,6 +6,8 @@ using System.Web.Mvc;
 using Fitbit;
 using Fitbit.Api;
 using System.Configuration;
+using Fitbit.Api.Config;
+using Fitbit.Config;
 using Fitbit.Models;
 
 namespace SampleWebMVC.Controllers
@@ -30,16 +32,12 @@ namespace SampleWebMVC.Controllers
             string ConsumerKey = ConfigurationManager.AppSettings["FitbitConsumerKey"];
             string ConsumerSecret = ConfigurationManager.AppSettings["FitbitConsumerSecret"];
 
+            var config = new FitBitConfiguration(ConsumerKey, ConsumerSecret);
 
-            Fitbit.Api.Authenticator authenticator = new Fitbit.Api.Authenticator(ConsumerKey,
-                                                                                    ConsumerSecret,
-                                                                                    "http://api.fitbit.com/oauth/request_token",
-                                                                                    "http://api.fitbit.com/oauth/access_token",
-                                                                                    "http://api.fitbit.com/oauth/authorize");
-            string authUrl = authenticator.GetAuthUrlToken();
+            Fitbit.Api.Authenticator authenticator = new Fitbit.Api.Authenticator(config);
+            var  authUrl = authenticator.GetAuthUrlToken();
 
-
-            return Redirect(authUrl);
+            return Redirect(authUrl.ClientUrl);
         }
 
         //Final step. Take this authorization information and use it in the app
@@ -52,15 +50,11 @@ namespace SampleWebMVC.Controllers
             string ConsumerSecret = ConfigurationManager.AppSettings["FitbitConsumerSecret"];
 
             //this is going to go back to Fitbit one last time (server to server) and get the user's permanent auth credentials
-
+            var config = new FitBitConfiguration(ConsumerKey, ConsumerSecret);
             //create the Authenticator object
-            Fitbit.Api.Authenticator authenticator = new Fitbit.Api.Authenticator(ConsumerKey,
-                                                                                    ConsumerSecret,
-                                                                                    "http://api.fitbit.com/oauth/request_token",
-                                                                                    "http://api.fitbit.com/oauth/access_token",
-                                                                                    "http://api.fitbit.com/oauth/authorize");
+            Fitbit.Api.Authenticator authenticator = new Fitbit.Api.Authenticator(config);
             //execute the Authenticator request to Fitbit
-            AuthCredential credential = authenticator.ProcessApprovedAuthCallback(OAuthToken, OAuthVerifier);
+            AuthCredential credential = authenticator.ProcessApprovedAuthCallback(OAuthToken, "123456", OAuthVerifier);
 
             //here, we now have everything we need for the future to go back to Fitbit's API (STORE THESE):
             //  credential.AuthToken;

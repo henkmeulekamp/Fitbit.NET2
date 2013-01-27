@@ -1,7 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Collections.Specialized;
+using System.Net;
+using Fitbit.Api.Config;
+using Fitbit.Api.Models;
+using Fitbit.Config;
 using RestSharp;
 using RestSharp.Authenticators;
 using RestSharp.Contrib;
@@ -11,114 +13,82 @@ namespace Fitbit.Api
 {
     public class Authenticator
     {
-        private string ConsumerKey;
-        private string ConsumerSecret;
-        private string RequestTokenUrl;
-        private string AccessTokenUrl;
-        private string AuthorizeUrl; 
+        private readonly FitBitConfiguration _configuration;
 
-        public Authenticator(string ConsumerKey, string ConsumerSecret, string RequestTokenUrl, string AccessTokenUrl, string AuthorizeUrl)
+        public Authenticator(FitBitConfiguration configuration)
         {
-            this.ConsumerKey = ConsumerKey;
-            this.ConsumerSecret = ConsumerSecret;
-            this.RequestTokenUrl = RequestTokenUrl;
-            this.AccessTokenUrl = AccessTokenUrl;
-            this.AuthorizeUrl = AuthorizeUrl;
-        }
+            if (configuration == null) throw new ArgumentNullException("configuration", "Configuration is a required parameter.");
 
+            _configuration = configuration;
+        }
         /// <summary>
         /// Use this method first to retrieve the url to redirect the user to to allow the url.
         /// Once they are done there, Fitbit will redirect them back to the predetermined completion URL
         /// </summary>
         /// <returns></returns>
-        public string GetAuthUrlToken()
+        public AuthStep GetAuthUrlToken()
         {
-			var baseUrl = "https://api.fitbit.com";
-			var client = new RestClient(baseUrl);
-			client.Authenticator = OAuth1Authenticator.ForRequestToken(this.ConsumerKey, this.ConsumerSecret);
-            
-            var request = new RestRequest("oauth/request_token", Method.POST);
-			var response = client.Execute(request);
+            var client = CreateRestClient();
 
+            var request = new RestRequest(_configuration.RequestTokenUrl, Method.POST);
+            IRestResponse response = client.Execute(request);
 
-			//Assert.NotNull(response);
-			//Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            if (HttpStatusCode.OK != response.StatusCode)
+            {
+                throw new Exception(string.Format("Request Token Step Failed: {0}, {1}\n{2}",
+                    response.StatusCode, response.StatusDescription, response.Content));
+            }
 
-            if(response.StatusCode != System.Net.HttpStatusCode.OK)
-                throw new Exception("Request Token Step Failed");
+            NameValueCollection qs = HttpUtility.ParseQueryString(response.Content);
+            string oauthToken = qs["oauth_token"];
+            string oauthTokenSecret = qs["oauth_token_secret"];
 
-			var qs = HttpUtility.ParseQueryString(response.Content);
-			var oauth_token = qs["oauth_token"];
-			var oauth_token_secret = qs["oauth_token_secret"];
+            request = new RestRequest(_configuration.AuthorizeUrl);
+            request.AddParameter("oauth_token", oauthToken);
+            string url = client.BuildUri(request).ToString();
 
-			//Assert.NotNull(oauth_token);
-			//Assert.NotNull(oauth_token_secret);
-
-			request = new RestRequest("oauth/authorize");
-			request.AddParameter("oauth_token", oauth_token);
-			var url = client.BuildUri(request).ToString();
-			//Process.Start(url);
-
-            return url;
+            return new AuthStep
+                       {
+                           OauthToken = oauthToken,
+                           AuthTokenSecret = oauthTokenSecret,
+                           ClientUrl = url  
+                       };
         }
 
-        public AuthCredential ProcessApprovedAuthCallback(string TempAuthToken, string Verifier)
+        private RestClient CreateRestClient()
         {
-            //var verifier = "123456"; // <-- Breakpoint here (set verifier in debugger)
-            
-            var baseUrl = "https://api.fitbit.com";
-            var client = new RestClient(baseUrl);
-            client.Authenticator = OAuth1Authenticator.ForRequestToken(this.ConsumerKey, this.ConsumerSecret);
+            var client = new RestClient(_configuration.BaseUrl)
+                             {
+                                 Authenticator =
+                                     OAuth1Authenticator.ForRequestToken(
+                                         _configuration.Consumerkey,
+                                         _configuration.ConsumerSecret)
+                             };
+            return client;
+        }
 
-            var request = new RestRequest("oauth/access_token", Method.POST);
-            
+        public AuthCredential ProcessApprovedAuthCallback(string tempAuthToken, string verifier, string tokenSecret)
+        {
+            var client = CreateRestClient();
+
+            var request = new RestRequest(_configuration.AccessTokenUrl, Method.POST);
 
             client.Authenticator = OAuth1Authenticator.ForAccessToken(
-                this.ConsumerKey, this.ConsumerSecret, TempAuthToken, "123456", Verifier
-            );
-            
-            var response = client.Execute(request);
+                _configuration.Consumerkey, _configuration.ConsumerSecret, tempAuthToken, tokenSecret, verifier);
 
-            //Assert.NotNull(response);
-            //Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            IRestResponse response = client.Execute(request);
 
-            var qs = HttpUtility.ParseQueryString(response.Content); //not actually parsing querystring, but body is formatted like htat
-            var oauth_token = qs["oauth_token"];
-            var oauth_token_secret = qs["oauth_token_secret"];
-            var encoded_user_id = qs["encoded_user_id"];
-            //Assert.NotNull(oauth_token);
-            //Assert.NotNull(oauth_token_secret);
+            NameValueCollection qs = HttpUtility.ParseQueryString(response.Content);
+            string oauthToken = qs["oauth_token"];
+            string oauthTokenSecret = qs["oauth_token_secret"];
+            string encodedUserId = qs["encoded_user_id"];
 
-            /*
-            request = new RestRequest("account/verify_credentials.xml");
-            client.Authenticator = OAuth1Authenticator.ForProtectedResource(
-                this.ConsumerKey, this.ConsumerSecret, oauth_token, oauth_token_secret
-            );
-
-            response = client.Execute(request);
-
-             */
-
-            return new AuthCredential()
-            {
-                AuthToken = oauth_token,
-                AuthTokenSecret = oauth_token_secret,
-                UserId = encoded_user_id
-            };
-
-            //Assert.NotNull(response);
-            //Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-            //request = new RestRequest("statuses/update.json", Method.POST);
-            //request.AddParameter("status", "Hello world! " + DateTime.Now.Ticks.ToString());
-            //client.Authenticator = OAuth1Authenticator.ForProtectedResource(
-            //    consumerKey, consumerSecret, oauth_token, oauth_token_secret
-            //);
-
-            //response = client.Execute(request);
-
-            //Assert.NotNull(response);
-            //Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            return new AuthCredential
+                       {
+                           AuthToken = oauthToken,
+                           AuthTokenSecret = oauthTokenSecret,
+                           UserId = encodedUserId
+                       };
         }
 
 

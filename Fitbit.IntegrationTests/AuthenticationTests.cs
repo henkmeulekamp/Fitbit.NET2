@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Fitbit.Api.Config;
+using Fitbit.Config;
 using NUnit.Framework;
 using Fitbit;
 using Fitbit.Api;
@@ -14,11 +16,10 @@ namespace Fitbit.IntegrationTests
     {
         public AuthenticationTests()
         {
-            authenticator = new Fitbit.Api.Authenticator(Configuration.ConsumerKey,
-                                            Configuration.ConsumerSecret,
-                                            "http://api.fitbit.com/oauth/request_token",
-                                            "http://api.fitbit.com/oauth/access_token",
-                                            "http://api.fitbit.com/oauth/authorize");
+            var config = new FitBitConfiguration(Configuration.ConsumerKey,
+                                                 Configuration.ConsumerSecret);
+
+            authenticator = new Fitbit.Api.Authenticator(config);
 
         }
 
@@ -34,11 +35,12 @@ namespace Fitbit.IntegrationTests
         [Test]
         public void Can_Retrieve_Access_Token_Authorization_Url()
         {
-            string authUrl = authenticator.GetAuthUrlToken();
-            
-            Assert.IsNotNull(authUrl);
-            Console.Write("authUrl:" + authUrl);
-            Assert.IsTrue(authUrl.Contains("https://api.fitbit.com/oauth/authorize?oauth_token="));
+            var authResult = authenticator.GetAuthUrlToken();
+
+            Assert.IsNotNull(authResult);
+            Console.Write("authUrl:" + authResult.ClientUrl);           
+
+            Assert.That(authResult.ClientUrl, Is.StringStarting("https://api.fitbit.com/oauth/authorize?oauth_token="));
         }
 
         /// <summary>
@@ -49,7 +51,7 @@ namespace Fitbit.IntegrationTests
         [Test]
         public void Can_Retrieve_Access_Token_And_Access_Token_Secret()
         {
-            AuthCredential authCredential = authenticator.ProcessApprovedAuthCallback(Configuration.TempAuthToken, Configuration.TempAuthVerifier);
+            AuthCredential authCredential = authenticator.ProcessApprovedAuthCallback(Configuration.TempAuthToken, "123456", Configuration.TempAuthVerifier);
 
             Assert.IsNotNull(authCredential.AuthToken);
             Console.WriteLine("AuthToken: " + authCredential.AuthToken);
